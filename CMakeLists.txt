@@ -71,8 +71,8 @@ set(VAST_INSTALL_CMAKEDIR
 set(CMAKE_INSTALL_SYSTEMDDIR
     "${CMAKE_INSTALL_LIBDIR}/systemd"
     CACHE PATH "Directory for installing systemd unit files")
-GNUInstallDirs_get_absolute_install_dir(
-  CMAKE_INSTALL_FULL_SYSTEMDDIR CMAKE_INSTALL_SYSTEMDDIR)
+gnuinstalldirs_get_absolute_install_dir(CMAKE_INSTALL_FULL_SYSTEMDDIR
+                                        CMAKE_INSTALL_SYSTEMDDIR)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(Helpers)
@@ -93,8 +93,10 @@ option(VAST_ENABLE_ASSERTIONS "Enable Assertions"
 option(VAST_RELOCATABLE_INSTALL "Enable relocatable installations" ON)
 option(VAST_USE_BUNDLED_CAF "Always use the CAF submodule" OFF)
 option(ENABLE_ZEEK_TO_VAST "Build zeek-to-vast" ON)
-option(VAST_STATIC_EXECUTABLE "Link VAST statically" $ENV{VAST_STATIC_EXECUTABLE})
-option(VAST_USE_JEMALLOC "Use jemalloc instead of libc malloc" "${VAST_STATIC_EXECUTABLE}")
+option(VAST_STATIC_EXECUTABLE "Link VAST statically"
+       $ENV{VAST_STATIC_EXECUTABLE})
+option(VAST_USE_JEMALLOC "Use jemalloc instead of libc malloc"
+       "${VAST_STATIC_EXECUTABLE}")
 cmake_dependent_option(
   BUILD_SHARED_LIBS "Build shared libraries instead of static" ON
   "NOT VAST_STATIC_EXECUTABLE" OFF)
@@ -648,7 +650,7 @@ if (NOT VAST_NO_ARROW)
     endforeach ()
   endif ()
   if (ARROW_ROOT_DIR)
-    set (Arrow_ROOT ${ARROW_ROOT_DIR})
+    set(Arrow_ROOT ${ARROW_ROOT_DIR})
   endif ()
   find_package(Arrow 0.17 REQUIRED QUIET CONFIG)
   string(APPEND VAST_FIND_DEPENDENCY_LIST
@@ -863,12 +865,13 @@ if (systemd_FOUND)
                  ${unit_content_})
   set(unit_file_ "${CMAKE_CURRENT_BINARY_DIR}/vast.service")
   file(WRITE ${unit_file_} ${unit_content_})
-  install(FILES "${unit_file_}" DESTINATION "${CMAKE_INSTALL_SYSTEMDDIR}/system")
+  install(FILES "${unit_file_}"
+          DESTINATION "${CMAKE_INSTALL_SYSTEMDDIR}/system")
   set(unit_file_dest_ "${CMAKE_INSTALL_FULL_SYSTEMDDIR}/system/vast.service")
   if (NOT "${systemd_SERVICES_INSTALL_DIR}" STREQUAL
       "${CMAKE_INSTALL_SYSTEMDDIR}")
-    install(
-      CODE "message(\"Use `systemctl link ${unit_file_dest_}`\n to register VAST with systemd.\")")
+    install(CODE "message(\"NOTE: Use `systemctl link ${unit_file_dest_}`\n\"
+                    \"      to register VAST with systemd.\")")
   endif ()
   unset(unit_content_)
   unset(unit_file_)
