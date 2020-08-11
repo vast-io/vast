@@ -14,6 +14,7 @@
 , broker
 , zstd
 , jemalloc
+, systemd
 , python3Packages
 , jq
 , tcpdump
@@ -36,10 +37,11 @@ let
 
   src = vast-source;
 
-  version = if (versionOverride != null) then versionOverride else stdenv.lib.fileContents (nix-gitDescribe src);
-in
-
-stdenv.mkDerivation rec {
+  version = if (versionOverride != null) then
+    versionOverride
+  else
+    stdenv.lib.fileContents (nix-gitDescribe src);
+in stdenv.mkDerivation rec {
   inherit src version;
   pname = "vast";
 
@@ -51,7 +53,8 @@ stdenv.mkDerivation rec {
 
   nativeBuildInputs = [ cmake ];
   propagatedNativeBuildInputs = [ pkgconfig pandoc ];
-  buildInputs = [ libpcap flatbuffers jemalloc broker ];
+  buildInputs = [ libpcap flatbuffers jemalloc broker ]
+    ++ lib.optionals stdenv.isLinux [ systemd ];
   propagatedBuildInputs = [ arrow-cpp caf ];
 
   cmakeFlags = [
@@ -83,7 +86,7 @@ stdenv.mkDerivation rec {
 
   meta = with lib; {
     description = "Visibility Across Space and Time";
-    homepage = http://vast.io/;
+    homepage = "http://tenzir.com/";
     license = licenses.bsd3;
     platforms = platforms.unix;
     maintainers = with maintainers; [ tobim ];
