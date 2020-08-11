@@ -65,7 +65,14 @@ include(GNUInstallDirs)
 set(CMAKE_INSTALL_CMAKEDIR
     "${CMAKE_INSTALL_LIBDIR}/cmake"
     CACHE PATH "Base directory for installing cmake specific artifacts")
-set(INSTALL_VAST_CMAKEDIR "${CMAKE_INSTALL_CMAKEDIR}/vast")
+set(VAST_INSTALL_CMAKEDIR
+    "${CMAKE_INSTALL_CMAKEDIR}/vast"
+    CACHE PATH "Directory for installing vast cmake files")
+set(CMAKE_INSTALL_SYSTEMDDIR
+    "${CMAKE_INSTALL_LIBDIR}/systemd"
+    CACHE PATH "Directory for installing systemd unit files")
+GNUInstallDirs_get_absolute_install_dir(
+  CMAKE_INSTALL_FULL_SYSTEMDDIR CMAKE_INSTALL_SYSTEMDDIR)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(Helpers)
@@ -437,7 +444,7 @@ macro (provide_find_module name)
   configure_file(cmake/Find${name}.cmake ${CMAKE_BINARY_DIR} COPYONLY)
   install(
     FILES "${CMAKE_BINARY_DIR}/Find${name}.cmake"
-    DESTINATION ${INSTALL_VAST_CMAKEDIR}
+    DESTINATION ${VAST_INSTALL_CMAKEDIR}
     COMPONENT dev)
 endmacro ()
 
@@ -561,7 +568,7 @@ elseif (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/aux/caf/CMakeLists.txt)
     NAMESPACE caf::)
   install(
     EXPORT CAFTargets
-    DESTINATION "${INSTALL_VAST_CMAKEDIR}"
+    DESTINATION "${VAST_INSTALL_CMAKEDIR}"
     NAMESPACE caf::)
   string(APPEND VAST_EXTRA_TARGETS_FILES
          "\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/CAFTargets.cmake\")")
@@ -660,6 +667,16 @@ if (NOT VAST_NO_ARROW)
   get_filename_component(arrow_dir ${arrow_dir} DIRECTORY) # <prefix>
 endif ()
 
+find_package(systemd)
+if (systemd_FOUND)
+  set(VAST_HAVE_SYSTEMD true)
+  if (NOT BUILD_SHARED_LIBS)
+    provide_find_module(systemd)
+    string(APPEND VAST_FIND_DEPENDENCY_LIST
+           "\nfind_package(systemd REQUIRED QUIET)")
+  endif ()
+endif ()
+
 # Add robin_map
 add_subdirectory(aux/robin-map)
 export(
@@ -668,7 +685,7 @@ export(
   NAMESPACE tsl::)
 install(
   EXPORT tsl-robin-mapTargets
-  DESTINATION "${INSTALL_VAST_CMAKEDIR}"
+  DESTINATION "${VAST_INSTALL_CMAKEDIR}"
   NAMESPACE tsl::)
 string(APPEND VAST_EXTRA_TARGETS_FILES
        "\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/tsl-robin-mapTargets.cmake\")")
@@ -787,7 +804,7 @@ export(
 
 install(
   EXPORT VASTTargets
-  DESTINATION "${INSTALL_VAST_CMAKEDIR}"
+  DESTINATION "${VAST_INSTALL_CMAKEDIR}"
   NAMESPACE vast::)
 
 include(CMakePackageConfigHelpers)
@@ -799,12 +816,12 @@ write_basic_package_version_file(
 configure_package_config_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VASTConfig.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/VASTConfig.cmake"
-  INSTALL_DESTINATION "${INSTALL_VAST_CMAKEDIR}")
+  INSTALL_DESTINATION "${VAST_INSTALL_CMAKEDIR}")
 
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/VASTConfig.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/VASTConfigVersion.cmake"
-  DESTINATION "${INSTALL_VAST_CMAKEDIR}")
+  DESTINATION "${VAST_INSTALL_CMAKEDIR}")
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/schema"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/vast")
@@ -834,6 +851,28 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
     DESTINATION "${CMAKE_INSTALL_PREFIX}/etc/rc.d"
     RENAME "vast"
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_EXECUTE)
+endif ()
+
+# Install the systemd unit file on linux.
+if (systemd_FOUND)
+  # The example service file hardcodes /opt/tenzir/bin/vast, we adjust it here
+  # according to the actual install location.
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/systemd/vast.service" unit_content_
+       NEWLINE_CONSUME)
+  string(REPLACE "/opt/tenzir/bin" "${CMAKE_INSTALL_FULL_BINDIR}" unit_content_
+                 ${unit_content_})
+  set(unit_file_ "${CMAKE_CURRENT_BINARY_DIR}/vast.service")
+  file(WRITE ${unit_file_} ${unit_content_})
+  install(FILES "${unit_file_}" DESTINATION "${CMAKE_INSTALL_SYSTEMDDIR}/system")
+  set(unit_file_dest_ "${CMAKE_INSTALL_FULL_SYSTEMDDIR}/system/vast.service")
+  if (NOT "${systemd_SERVICES_INSTALL_DIR}" STREQUAL
+      "${CMAKE_INSTALL_SYSTEMDDIR}")
+    install(
+      CODE "message(\"Use `systemctl link ${unit_file_dest_}`\n to register VAST with systemd.\")")
+  endif ()
+  unset(unit_content_)
+  unset(unit_file_)
+  unset(unit_file_dest_)
 endif ()
 
 # ------------------------------------------------------------------------------
