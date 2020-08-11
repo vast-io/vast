@@ -828,8 +828,10 @@ install(
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/schema"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/vast")
 
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/integration"
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/vast")
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/integration"
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/vast"
+  PATTERN ".mypy_cache" EXCLUDE)
 
 install(
   FILES "${CMAKE_CURRENT_SOURCE_DIR}/vast.conf"
