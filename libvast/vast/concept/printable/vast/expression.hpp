@@ -11,13 +11,13 @@
 #include "vast/concept/printable/core.hpp"
 #include "vast/concept/printable/numeric.hpp"
 #include "vast/concept/printable/string.hpp"
-#include "vast/concept/printable/vast/data.hpp"
 #include "vast/concept/printable/vast/none.hpp"
 #include "vast/concept/printable/vast/offset.hpp"
 #include "vast/concept/printable/vast/operator.hpp"
 #include "vast/concept/printable/vast/type.hpp"
 #include "vast/data.hpp"
 #include "vast/expression.hpp"
+#include "vast/fmt_integration.hpp"
 
 #include <caf/none.hpp>
 
@@ -76,7 +76,8 @@ struct expression_printer : printer<expression_printer> {
     }
 
     bool operator()(const data& d) const {
-      return printers::data(out_, d);
+      out_ = fmt::format_to(out_, "{:a}", d);
+      return true;
     }
 
     Iterator& out_;

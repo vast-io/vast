@@ -111,11 +111,6 @@ struct record_view_printer : printer<record_view_printer> {
 // -- printer registry setup ---------------------------------------------------
 
 template <>
-struct printer_registry<view<data>> {
-  using type = data_view_printer;
-};
-
-template <>
 struct printer_registry<view<pattern>> {
   using type = pattern_view_printer;
 };

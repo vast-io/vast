@@ -17,15 +17,16 @@
 #include "vast/concept/parseable/vast/data.hpp"
 #include "vast/concept/printable/stream.hpp"
 #include "vast/concept/printable/to_string.hpp"
-#include "vast/concept/printable/vast/data.hpp"
 #include "vast/concept/printable/vast/json.hpp"
 #include "vast/detail/deserialize.hpp"
 #include "vast/detail/serialize.hpp"
+#include "vast/fmt_integration.hpp"
 
 #include <caf/test/dsl.hpp>
 
 using namespace vast;
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 
 TEST(list) {
   REQUIRE(std::is_same_v<std::vector<data>, list>);
@@ -370,4 +371,30 @@ TEST(nesting depth) {
   auto flattened = flatten(final);
   auto unflattened = unflatten(flattened);
   CHECK_EQUAL(depth(flattened), 1ull);
+}
+
+TEST(fmt rendering numbers) {
+  auto x = data{-3.14};
+  CHECK_EQUAL(fmt::format("{}", data{x}), "-3.14");
+  CHECK_EQUAL(fmt::format("{:a}", data{x}), "-3.14");
+  CHECK_EQUAL(fmt::format("{:j}", data{x}), "-3.14");
+  CHECK_EQUAL(fmt::format("{:y}", data{x}), "-3.14");
+
+  x = data{2.71828};
+  CHECK_EQUAL(fmt::format("{}", data{x}), "2.71828");
+  CHECK_EQUAL(fmt::format("{:a}", data{x}), "2.71828");
+  CHECK_EQUAL(fmt::format("{:j}", data{x}), "2.71828");
+  CHECK_EQUAL(fmt::format("{:y}", data{x}), "2.71828");
+
+  x = data{-42};
+  CHECK_EQUAL(fmt::format("{}", data{x}), "-42");
+  CHECK_EQUAL(fmt::format("{:a}", data{x}), "-42");
+  CHECK_EQUAL(fmt::format("{:j}", data{x}), "-42");
+  CHECK_EQUAL(fmt::format("{:y}", data{x}), "-42");
+
+  x = data{42};
+  CHECK_EQUAL(fmt::format("{}", data{x}), "42");
+  CHECK_EQUAL(fmt::format("{:a}", data{x}), "42");
+  CHECK_EQUAL(fmt::format("{:j}", data{x}), "42");
+  CHECK_EQUAL(fmt::format("{:y}", data{x}), "42");
 }

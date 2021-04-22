@@ -8,13 +8,14 @@
 
 #pragma once
 
+#include "vast/fwd.hpp"
+
 #include "vast/aliases.hpp"
 #include "vast/data.hpp"
 #include "vast/detail/assert.hpp"
 #include "vast/detail/iterator.hpp"
 #include "vast/detail/operators.hpp"
 #include "vast/detail/type_traits.hpp"
-#include "vast/fwd.hpp"
 #include "vast/time.hpp"
 
 #include <caf/intrusive_ptr.hpp>
@@ -163,6 +164,9 @@ struct view_trait<data> {
   using type = data_view;
 };
 
+caf::expected<std::string> to_string(const view<data>& d);
+caf::expected<std::string> to_string_test(const view<data>& d);
+
 // -- operators ----------------------------------------------------------------
 
 // We cannot use operator== and operator!= here because data has a non-explicit
@@ -262,12 +266,8 @@ namespace detail {
 /// @relates view_trait
 template <class T>
 class container_view_iterator
-  : public detail::iterator_facade<
-      container_view_iterator<T>,
-      T,
-      std::random_access_iterator_tag,
-      T
-    > {
+  : public detail::iterator_facade<container_view_iterator<T>, T,
+                                   std::random_access_iterator_tag, T> {
   friend iterator_access;
 
 public:
@@ -312,9 +312,8 @@ private:
 /// Base class for container views.
 /// @relates view_trait
 template <class T>
-struct container_view
-  : caf::ref_counted,
-    detail::totally_ordered<container_view<T>> {
+struct container_view : caf::ref_counted,
+                        detail::totally_ordered<container_view<T>> {
   using value_type = T;
   using size_type = size_t;
   using iterator = detail::container_view_iterator<T>;
@@ -388,9 +387,8 @@ struct map_view_ptr : container_view_ptr<std::pair<data_view, data_view>> {};
 
 /// A view over a @ref map.
 /// @relates view_trait
-class default_map_view
-  : public container_view<std::pair<data_view, data_view>>,
-    detail::totally_ordered<default_map_view> {
+class default_map_view : public container_view<std::pair<data_view, data_view>>,
+                         detail::totally_ordered<default_map_view> {
 public:
   explicit default_map_view(const map& xs);
 
@@ -532,3 +530,80 @@ data_view to_canonical(const type& t, const data_view& x);
 data_view to_internal(const type& t, const data_view& x);
 
 } // namespace vast
+
+namespace fmt {
+
+template <>
+struct formatter<vast::view<vast::pattern>> : formatter<vast::pattern> {};
+
+template <>
+struct formatter<std::pair<vast::view<vast::data>, vast::view<vast::data>>>
+  : formatter<vast::map::value_type> {};
+
+template <>
+struct formatter<std::pair<std::string_view, vast::view<vast::data>>>
+  : formatter<vast::record::value_type> {};
+
+template <>
+struct formatter<vast::view<vast::data>> : formatter<vast::data> {
+  using super = formatter<vast::data>;
+  using this_type = formatter<vast::data>;
+
+  template <typename Output>
+  struct ascii_visitor : super::ascii_visitor<Output> {
+    using super::ascii_visitor<Output>::operator();
+
+    auto operator()(const vast::view<vast::list>& xs) {
+      return format_to(this->out_, "[{}]", ::fmt::join(xs, ", "));
+    }
+    auto operator()(const vast::view<vast::map>& xs) {
+      return format_to(this->out_, "{{{}}}", ::fmt::join(xs, ", "));
+    }
+    auto operator()(const vast::view<vast::record>& xs) {
+      return format_to(this->out_, "<{}>", ::fmt::join(xs, ", "));
+    }
+  };
+
+  template <typename Output, class PrintTraits>
+  struct json_visitor : super::json_visitor<Output, PrintTraits> {
+    using json_visitor_base = super::json_visitor<Output, PrintTraits>;
+    using json_visitor_base::json_visitor_base;
+
+    using super::json_visitor<Output, PrintTraits>::operator();
+
+    auto operator()(const vast::view<vast::list>& xs) {
+      return json_visitor_base::template format_list(*this, xs);
+    }
+    auto operator()(const vast::view<vast::map>& xs) {
+      return json_visitor_base::template format_map(*this, xs);
+    }
+    auto operator()(const vast::view<vast::record>& xs) {
+      return json_visitor_base::template format_record(*this, xs);
+    }
+  };
+
+  struct yaml_visitor : super::yaml_visitor {
+    using super::yaml_visitor::operator();
+
+    auto operator()(const vast::view<vast::pattern>& x) {
+      out_ << to_string(x);
+    }
+
+    auto operator()(const vast::view<vast::list>& xs) {
+      super::yaml_visitor::format_list(*this, xs);
+    }
+    auto operator()(const vast::view<vast::map>& xs) {
+      super::yaml_visitor::format_map(*this, xs);
+    }
+    auto operator()(const vast::view<vast::record>& xs) {
+      super::yaml_visitor::format_record(*this, xs);
+    }
+  };
+
+  template <class FormatContext>
+  auto format(const vast::view<vast::data>& x, FormatContext& ctx) const {
+    return super::format_impl(*this, x, ctx);
+  }
+};
+
+} // namespace fmt

@@ -10,6 +10,8 @@
 
 #include "vast/detail/operators.hpp"
 
+#include <fmt/format.h>
+
 #include <string>
 
 namespace vast {
@@ -93,3 +95,20 @@ private:
 };
 
 } // namespace vast
+
+namespace fmt {
+/// Custom formatter for `vast::pattern` type.
+template <>
+struct formatter<vast::pattern> {
+  template <class ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return std::end(ctx);
+  }
+
+  template <class P, class FormatContext>
+  auto format(const P& p, FormatContext& ctx) {
+    return format_to(ctx.out(), "/{}/", p.string());
+  }
+};
+
+} // namespace fmt
