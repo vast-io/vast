@@ -74,7 +74,9 @@ caf::expected<chunk_ptr> chunk::mmap(const std::filesystem::path& filename,
   if (map == MAP_FAILED)
     return caf::make_error(ec::filesystem_error,
                            fmt::format("failed to mmap file {}", filename));
-  auto deleter = [=]() noexcept { ::munmap(map, size); };
+  auto deleter = [=]() noexcept {
+    ::munmap(map, size);
+  };
   return make(map, size, std::move(deleter));
 }
 
@@ -126,7 +128,15 @@ chunk_ptr chunk::slice(size_type start, size_type length) const {
   if (length > size() - start)
     length = size() - start;
   this->ref();
-  return make(view_.subspan(start, length), [=]() noexcept { this->deref(); });
+  return make(view_.subspan(start, length), [=]() noexcept {
+    this->deref();
+  });
+}
+
+chunk_ptr chunk::slice(view_type view) const {
+  VAST_ASSERT(view.begin() >= begin());
+  VAST_ASSERT(view.end() <= end());
+  return slice(std::distance(begin(), view.begin()), view.size());
 }
 
 // -- concepts -----------------------------------------------------------------
@@ -168,8 +178,12 @@ caf::error inspect(caf::serializer& sink, const chunk_ptr& x) {
   if (x == nullptr)
     return sink(uint32_t{0});
   return caf::error::eval(
-    [&] { return sink(narrow<uint32_t>(x->size())); },
-    [&] { return sink.apply_raw(x->size(), const_cast<std::byte*>(x->data())); });
+    [&] {
+      return sink(narrow<uint32_t>(x->size()));
+    },
+    [&] {
+      return sink.apply_raw(x->size(), const_cast<std::byte*>(x->data()));
+    });
 }
 
 caf::error inspect(caf::deserializer& source, chunk_ptr& x) {
