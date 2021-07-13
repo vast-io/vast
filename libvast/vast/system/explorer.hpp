@@ -53,6 +53,7 @@ struct explorer_state {
 
   /// Keeps a record of the ids that were already returned to the sink,
   /// for the purpose of deduplication.
+  // std::unordered_map<vast::uuid, std::unordered_set<size_t>> returned_ids;
   std::unordered_set<size_t> returned_ids;
 
   /// A tracking counter of spawned exporters. Used for lifetime management.

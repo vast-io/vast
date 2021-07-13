@@ -199,6 +199,8 @@ using meta_index_actor = typed_actor_fwd<
     atom::ok>,
   // Erase a single partition synopsis.
   caf::replies_to<atom::erase, uuid>::with<atom::ok>,
+  // Returns the partition that contains the given id.
+  caf::replies_to<atom::get, vast::id>::with<vast::uuid>,
   // Evaluate the expression.
   caf::replies_to<expression>::with< //
     std::vector<uuid>>>::unwrap;

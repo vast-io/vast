@@ -43,14 +43,44 @@ table v0 {
   opaque_synopsis: opaque_synopsis.v0;
 }
 
+namespace vast.fbs;
+
+struct interval {
+  start: int64;
+  end: int64;
+}
+
+struct uinterval {
+  start: uint64;
+  end: uint64;
+}
+
 namespace vast.fbs.partition_synopsis;
 
 table v0 {
   /// Synopses for individual fields.
-  // TODO: Split this into separate vectors for field synopses
-  // and type synopses.
   synopses: [synopsis.v0];
+
+  // TODO: Should we switch to a v1 synopsis, instead of
+  // adding a new optional field?
+  /// The id range of this partition
+  id_range: vast.fbs.uinterval;
 }
+
+// table v1 {
+//   /// Synopses for individual fields.
+//   field_synopses: [synopsis.v0];
+// 
+//   /// Synopses for specific types.
+//   type_synopses: [synopsis.v0];
+// 
+//   // Segment offsets for this partition.
+//   struct interval {
+//     start: int64;
+//     end: int64;
+//   }
+//   id_range: [uint64]
+// }
 
 namespace vast.fbs.partition_synopsis;
 

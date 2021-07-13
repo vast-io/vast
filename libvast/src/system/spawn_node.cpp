@@ -114,7 +114,7 @@ spawn_node(caf::scoped_actor& self, const caf::settings& opts) {
         });
     return result;
   };
-  std::list components = {"type-registry", "archive", "index",
+  std::list components = {"type-registry", "archive", "meta-index",  "index",
                           "importer",      "eraser",  "disk-monitor"};
   if (accounting)
     components.push_front("accountant");

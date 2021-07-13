@@ -47,6 +47,7 @@
 #include "vast/system/spawn_exporter.hpp"
 #include "vast/system/spawn_importer.hpp"
 #include "vast/system/spawn_index.hpp"
+#include "vast/system/spawn_meta_index.hpp"
 #include "vast/system/spawn_node.hpp"
 #include "vast/system/spawn_or_connect_to_node.hpp"
 #include "vast/system/spawn_pivoter.hpp"
@@ -107,8 +108,8 @@ bool is_singleton(std::string_view type) {
   // refactoring will be much easier once the NODE itself is a typed actor, so
   // let's hold off until then.
   const char* singletons[]
-    = {"accountant", "archive",  "disk-monitor", "eraser",
-       "filesystem", "importer", "index",        "type-registry"};
+    = {"accountant", "archive",    "disk-monitor", "eraser",       "filesystem",
+       "importer",   "meta-index", "index",        "type-registry"};
   auto pred = [&](const char* x) {
     return x == type;
   };
@@ -389,6 +390,7 @@ auto make_component_factory() {
     {"spawn importer", lift_component_factory<spawn_importer>()},
     {"spawn type-registry", lift_component_factory<spawn_type_registry>()},
     {"spawn index", lift_component_factory<spawn_index>()},
+    {"spawn meta-index", lift_component_factory<spawn_meta_index>()},
     {"spawn pivoter", lift_component_factory<spawn_pivoter>()},
     {"spawn source", lift_component_factory<spawn_source>()},
     {"spawn source csv", lift_component_factory<spawn_source>()},
@@ -435,6 +437,7 @@ auto make_command_factory() {
     {"spawn importer", node_state::spawn_command},
     {"spawn type-registry", node_state::spawn_command},
     {"spawn index", node_state::spawn_command},
+    {"spawn meta-index", node_state::spawn_command},
     {"spawn pivoter", node_state::spawn_command},
     {"spawn sink ascii", node_state::spawn_command},
     {"spawn sink csv", node_state::spawn_command},
