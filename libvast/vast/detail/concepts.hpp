@@ -8,7 +8,10 @@
 
 #pragma once
 
+#include "vast/detail/type_traits.hpp"
+
 #include <iterator>
+#include <type_traits>
 
 namespace vast::detail {
 
@@ -30,6 +33,23 @@ concept byte_container = requires(T t) {
   std::data(t);
   std::size(t);
   sizeof(decltype(*std::data(t))) == 1;
+};
+
+struct any_callable {
+  template <class... Ts>
+  void operator()(Ts&&...);
+};
+
+/// Inspectables
+template <class T>
+concept is_inspectable = requires(detail::any_callable& i, T& x) {
+  {inspect(i, x)};
+};
+
+/// push_back
+template <class C>
+concept has_push_back = requires(C xs, typename C::value_type x) {
+  xs.push_back(x);
 };
 
 } // namespace vast::detail
