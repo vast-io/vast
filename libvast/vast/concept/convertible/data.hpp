@@ -22,6 +22,11 @@
 
 #include <concepts>
 
+// TODO:
+// - Add mappend support where possible
+// - Narrowing count
+// - Improve error messages
+
 /// Assigns fields from `src` to `dst`.
 /// The source must have a structure that matches the destination.
 /// For example:
@@ -78,6 +83,13 @@ caf::error convert(const record_type& layout, const record& src, T& dst);
 template <has_layout T>
 caf::error convert(const record& src, T& dst);
 
+// Generic overload when `src` and `dst` are of the same type.
+template <class Type, class T>
+caf::error convert(const Type&, const T& src, T& dst) {
+  dst = src;
+  return caf::none;
+}
+
 // Dispatch to standard conversion.
 // clang-format off
 template <class Type, class From, class To>
@@ -88,10 +100,21 @@ caf::error convert(const Type&, const From& src, To& dst) {
 }
 // clang-format on
 
-// Generic overload when `src` and `dst` are of the same type.
-template <class Type, class T>
-caf::error convert(const Type&, const T& src, T& dst) {
-  dst = src;
+// Overload for integers.
+template <std::signed_integral To>
+caf::error convert(const integer_type&, const integer& i, To& dst) {
+  if constexpr (sizeof(To) >= sizeof(integer::value)) {
+    dst = i.value;
+  } else {
+    if (i.value < std::numeric_limits<To>::min()
+        || i.value > std::numeric_limits<To>::max())
+      return caf::make_error(ec::convert_error,
+                             fmt::format("{} can not be represented by the "
+                                         "target variable [{}, {}]",
+                                         i, std::numeric_limits<To>::min(),
+                                         std::numeric_limits<To>::max()));
+    dst = detail::narrow_cast<To>(i.value);
+  }
   return caf::none;
 }
 
@@ -141,7 +164,7 @@ caf::error convert(const map_type& t, const map& src, To& dst) {
 }
 // clang-format on
 
-// Overload for maps.
+// Overload for record to map.
 // clang-format off
 template <detail::has_insert To>
   requires requires {
@@ -161,20 +184,77 @@ caf::error convert(const map_type& t, const record& src, To& dst) {
 }
 // clang-format on
 
-// Overload for integers.
-template <std::signed_integral To>
-caf::error convert(const integer_type&, const integer& i, To& dst) {
-  if constexpr (sizeof(To) >= sizeof(integer::value)) {
-    dst = i.value;
-  } else {
-    if (i.value < std::numeric_limits<To>::min()
-        || i.value > std::numeric_limits<To>::max())
-      return caf::make_error(ec::convert_error,
-                             fmt::format("{} can not be represented by the "
-                                         "target variable [{}, {}]",
-                                         i, std::numeric_limits<To>::min(),
-                                         std::numeric_limits<To>::max()));
-    dst = detail::narrow_cast<To>(i.value);
+// Overload for list to map.
+// clang-format off
+template <detail::has_insert To>
+  requires requires {
+    typename To::key_type;
+    typename To::mapped_type;
+  }
+// clang-format on
+caf::error convert(const list_type& t, const list& src, To& dst) {
+  const auto* r = caf::get_if<record_type>(&t.value_type);
+  if (!r)
+    return caf::make_error(ec::convert_error, "no record in list");
+  // Look for the "key" attribute in `r`.
+  auto rs = record_type::each::range_state{};
+  for (const auto& leaf : record_type::each(*r)) {
+    if (has_attribute(leaf.type(), "key")) {
+      if (!rs.offset.empty())
+        return caf::make_error(ec::convert_error, "key field must be unique "
+                                                  "TODO");
+      rs = leaf;
+    }
+  }
+  if (rs.offset.empty())
+    return caf::make_error(ec::convert_error, "record in list is missing a key "
+                                              "field");
+  std::vector<std::string_view> path;
+  for (const auto* f : rs.trace)
+    path.emplace_back(f->name);
+  auto pruned = remove_field(*r, path);
+  VAST_ASSERT(pruned);
+  for (const auto& element : src) {
+    const auto* rec = caf::get_if<record>(&element);
+    if (!rec)
+      return caf::make_error(ec::convert_error, "no record in list");
+    // Find the value from the record
+    const auto* src_section = rec;
+    auto it = src_section->end();
+    size_t depth = 0;
+    for (; depth < rs.trace.size() - 1; depth++) {
+      const auto* node = rs.trace[depth];
+      it = src_section->find(node->name);
+      if (it == src_section->end())
+        return caf::none;
+      src_section = caf::get_if<record>(&it->second);
+      if (!src_section)
+        return caf::make_error(ec::convert_error, "{} is of unexpected type {}",
+                               node->name, it->second);
+    }
+    it = src_section->find(rs.trace[depth]->name);
+    if (it == src_section->end())
+      return caf::none;
+    using mapped_type = typename To::mapped_type;
+    typename To::key_type key{};
+    mapped_type value{};
+    if (auto err = convert(rs.type(), it->second, key))
+      return err;
+    if (auto err = convert(*pruned, *rec, value))
+      return err;
+    auto entry = dst.find(key);
+    if (entry == dst.end()) {
+      dst.insert({std::move(key), std::move(value)});
+    } else {
+      if constexpr (detail::monoid<mapped_type>)
+        entry->second = mappend(std::move(entry->second), std::move(value));
+      else
+        // TODO: Consider continuing if the old and new values are the same.
+        return caf::make_error(ec::convert_error,
+                               fmt::format("{}: redefinition detected: \"{}\" "
+                                           "vs \"{}\"",
+                                           key, entry->second, value));
+    }
   }
   return caf::none;
 }
@@ -239,16 +319,13 @@ public:
   }
 
   template <class... Ts>
-  caf::error operator()(Ts&... xs) {
-    return apply_all(std::index_sequence_for<Ts...>{}, xs...);
-  }
-
-  template <class... Ts, size_t... Is>
-  caf::error apply_all(std::index_sequence<Is...>, Ts&... xs) {
+  caf::error operator()(Ts&&... xs) {
     const auto& rng = record_type::each(layout);
     auto it = rng.begin();
-    return caf::error::eval([&] {
-      return apply(*it++, xs);
+    return caf::error::eval([&]() -> caf::error {
+      if constexpr (!caf::meta::is_annotation<decltype(xs)>::value)
+        return apply(*it++, xs);
+      return caf::none;
     }...);
   }
 
