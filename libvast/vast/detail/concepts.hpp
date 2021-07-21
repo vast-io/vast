@@ -52,4 +52,9 @@ concept has_push_back = requires(C xs, typename C::value_type x) {
   xs.push_back(x);
 };
 
+template <class T>
+concept monoid = requires(T x, T y) {
+  { mappend(x, y) } -> std::same_as<T>;
+};
+
 } // namespace vast::detail
